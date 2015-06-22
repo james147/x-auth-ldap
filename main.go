@@ -68,7 +68,7 @@ func handleAuth(w http.ResponseWriter, r *http.Request) {
 	// Validate user is in correct group
 	// TODO
 
-	w.Header().Set("X-Accel-Redirect", "/protected/index.html")
+	w.Header().Set("X-Accel-Redirect", "/protected"+r.URL.RequestURI())
 	w.Header().Set("Content-Type", "1")
 	w.WriteHeader(204)
 }
