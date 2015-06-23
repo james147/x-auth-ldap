@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-
-	"gopkg.in/ldap.v1"
 )
 
 var (
@@ -18,55 +16,52 @@ var (
 	attributes   []string
 	bindUser     string
 	bindPassword string
+	group        string
 )
 
 func authFailed(w http.ResponseWriter) {
-	w.Header().Add("WWW-Authenticate", `Basic realm="LDAP"`)
-	http.Error(w, "Unauthorized", 401)
 }
 
 func handelError(w http.ResponseWriter, err error) {
-	log.Println(err)
-	http.Error(w, "Internal server error", 500)
 }
 
 func handleAuth(w http.ResponseWriter, r *http.Request) {
+	validate := func(ok bool, err error) bool {
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "Internal server error", 500)
+			return false
+		} else if !ok {
+			w.Header().Add("WWW-Authenticate", `Basic realm="LDAP"`)
+			http.Error(w, "Unauthorized", 401)
+			return false
+		}
+		return true
+	}
+
 	username, password, ok := r.BasicAuth()
-	if !ok {
-		authFailed(w)
+	if !validate(ok, nil) {
 		return
 	}
 
-	// Bind to ldap server
-	l, err := connect(bindUser, bindPassword)
-	if err != nil {
-		handelError(w, err)
+	l, err := LDAPConnectAndBind(ldapServer, ldapPort, bindUser, bindPassword)
+	if !validate(true, err) {
 		return
 	}
 	defer l.Close()
 
-	// See if the user exists
-	user, err := findUser(l, username)
-	if err != nil {
-		handelError(w, err)
+	ok, err = l.ValidateUser(username)
+	if !validate(ok, err) {
 		return
 	}
-
-	if user == nil {
-		authFailed(w)
+	ok, err = l.AuthenticateUser(username, password)
+	if !validate(ok, err) {
 		return
 	}
-
-	// Validate users password
-	userconn, err := connect(user.DN, password)
-	if err != nil {
-		authFailed(w)
+	ok, err = l.AuthorizeUser(username, group)
+	if !validate(ok, err) {
 		return
 	}
-	userconn.Close()
-
-	// Validate user is in correct group
-	// TODO
 
 	w.Header().Set("X-Accel-Redirect", "/protected/index.html")
 	w.Header().Set("Content-Type", "1")
@@ -88,41 +83,4 @@ func main() {
 
 	http.HandleFunc("/", handleAuth)
 	http.ListenAndServe(":8080", nil)
-}
-
-func connect(bindUser, bindPassword string) (*ldap.Conn, error) {
-	l, err := ldap.Dial("tcp", fmt.Sprintf("%s:%d", ldapServer, ldapPort))
-	if err != nil {
-		return nil, err
-	}
-
-	err = l.Bind(bindUser, bindPassword)
-	if err != nil {
-		return nil, err
-	}
-	return l, nil
-}
-
-func findUser(l *ldap.Conn, username string) (*ldap.Entry, error) {
-	filter = fmt.Sprintf("(&(uid=%s))", username)
-
-	search := ldap.NewSearchRequest(
-		baseDN,
-		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		filter,
-		attributes,
-		nil)
-
-	sr, err := l.Search(search)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(sr.Entries) == 0 {
-		return nil, nil
-	} else if len(sr.Entries) > 1 {
-		return nil, fmt.Errorf("Found too many users: %d", len(sr.Entries))
-	}
-
-	return sr.Entries[0], nil
 }
