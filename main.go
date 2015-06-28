@@ -72,7 +72,7 @@ func main() {
 	ldapServer = os.Getenv("LDAP_URL")
 	p, err := strconv.Atoi(os.Getenv("LDAP_PORT"))
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("Invalid port '%s'", os.Getenv("LDAP_PORT"))
 		os.Exit(2)
 	}
 	ldapPort = uint16(p)
