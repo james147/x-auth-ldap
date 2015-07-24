@@ -7,7 +7,7 @@
 # you're doing.
 Vagrant.configure(2) do |config|
   config.vm.box = "ubuntu/trusty64"
-  config.vm.network "forwarded_port", guest: 80, host: 3000
+  config.vm.network "forwarded_port", guest: 80, host: 3333
   config.vm.provision "shell", inline: <<-SHELL
     apt-get install -y nginx
     cp /vagrant/nginx.example.conf /etc/nginx/sites-available/default
