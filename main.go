@@ -68,24 +68,50 @@ func handleAuth(w http.ResponseWriter, r *http.Request) {
 	// Validate user is in correct group
 	// TODO
 
-	w.Header().Set("X-Accel-Redirect", "/protected"+r.URL.RequestURI())
+	w.Header().Set("X-Accel-Redirect", "/protected"+r.RequestURI)
 	w.Header().Set("Content-Type", "1")
 	w.WriteHeader(204)
 }
 
 func main() {
 	ldapServer = os.Getenv("LDAP_URL")
-	p, err := strconv.Atoi(os.Getenv("LDAP_PORT"))
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(2)
-	}
-	ldapPort = uint16(p)
 	baseDN = os.Getenv("LDAP_BASE_DN")
 	attributes = []string{"dn", "cn", "uid", "memberOf"}
 	bindUser = os.Getenv("LDAP_BIND_USERNAME")
 	bindPassword = os.Getenv("LDAP_BIND_PASSWORD")
 
+	if os.Getenv("LDAP_PORT") == "" {
+		fmt.Printf("Must specify 'LDAP_PORT' environment variable")
+		os.Exit(2)
+	}
+
+	p, err := strconv.Atoi(os.Getenv("LDAP_PORT"))
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(2)
+	}
+
+	if ldapServer == "" {
+		fmt.Printf("Must specify 'LDAP_URL' environment variable")
+		os.Exit(2)
+	}
+
+	if baseDN == "" {
+		fmt.Printf("Must specify 'LDAP_BASE_DN' environment variable")
+		os.Exit(2)
+	}
+
+	if bindUser == "" {
+		fmt.Printf("Must specify 'LDAP_BIND_USERNAME' environment variable")
+		os.Exit(2)
+	}
+
+	if bindPassword == "" {
+		fmt.Printf("Must specify 'LDAP_BIND_PASSWORD' environment variable")
+		os.Exit(2)
+	}
+
+	ldapPort = uint16(p)
 	http.HandleFunc("/", handleAuth)
 	http.ListenAndServe(":8080", nil)
 }
